@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>parser</title>
+<script type="text/javascript">
+
+const MAX = 100;
+
+const latestUrl = "https://blockchain.info/latestblock?cors=true";
+const singleBlockUrl = "https://blockchain.info/rawblock/";
+const surfix = "?cors=true";
+var iteration = 0;
+var result = [];
+
+httpGetAsync(latestUrl, readLatestHash);
+
+function readLatestHash(json) {
+	var obj = JSON.parse(json);
+	const hash = obj.hash;
+	const url = singleBlockUrl + obj.hash + surfix;
+	httpGetAsync(url, readBlock);
+}
+
+function readBlock(json) {
+	var obj = JSON.parse(json);
+	const time = obj.time;
+	const tx = obj.tx;
+	var txTime = [];
+
+	tx.forEach(function(element) {
+		txTime.push(element.time);
+	});
+	const times = {
+		blockTime: time,
+		txTime: txTime,
+		height: obj.height
+	};
+
+	append(times);
+	iteration ++;
+
+	if (iteration < MAX) {
+		const url = singleBlockUrl + obj.prev_block + surfix;
+		httpGetAsync(url, readBlock);
+	}
+}
+
+function append(times) {
+	const l = result.length;
+	if (l == 0) {
+		result.push(times);
+	} else {
+		result[l - 1].prevTime = times.blockTime;
+		summarize(result[l - 1]);
+		result.push(times);
+	}
+}
+
+function summarize(block) {
+	var inCount = 0;
+	var outCount = 0;
+
+	var numOfTx = block.txTime.length;
+
+	block.txTime.forEach(function(element) {
+		if (element >= block.prevTime) {
+			inCount ++;
+		} else {
+			outCount ++;
+			//console.log("tx time:" + element + ", prev time:" + block.prevTime);
+		}
+	});
+
+	console.log(block.height + " - in: " + inCount + ", out: " + outCount + "; interval: " + (block.blockTime - block.prevTime));
+}
+
+//https://stackoverflow.com/questions/247483/http-get-request-in-javascript
+function httpGetAsync(url, callback) {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.onreadystatechange = function() { 
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200){
+            callback(xmlHttp.responseText);
+        }
+    }
+    xmlHttp.open("GET", url, true);
+    xmlHttp.send();
+}
+</script>
+</head>
+<body>
+
+<p id="output"></p>
+
+</body>
+</html>
